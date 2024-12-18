@@ -84,11 +84,9 @@ import {
   getDisconnectReasonFromConnectionError,
   getEmptyAudioStreamTrack,
   isBrowserSupported,
-  isCloud,
   isReactNative,
   isWeb,
   supportsSetSinkId,
-  toHttpUrl,
   unpackStreamId,
   unwrapConstraint,
 } from './utils';
@@ -447,24 +445,26 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
     if (this.state !== ConnectionState.Disconnected) {
       return;
     }
-    this.log.debug(`prepareConnection to ${url}`, this.logContext);
-    try {
-      if (isCloud(new URL(url)) && token) {
-        this.regionUrlProvider = new RegionUrlProvider(url, token);
-        const regionUrl = await this.regionUrlProvider.getNextBestRegionUrl();
-        // we will not replace the regionUrl if an attempt had already started
-        // to avoid overriding regionUrl after a new connection attempt had started
-        if (regionUrl && this.state === ConnectionState.Disconnected) {
-          this.regionUrl = regionUrl;
-          await fetch(toHttpUrl(regionUrl), { method: 'HEAD' });
-          this.log.debug(`prepared connection to ${regionUrl}`, this.logContext);
-        }
-      } else {
-        await fetch(toHttpUrl(url), { method: 'HEAD' });
-      }
-    } catch (e) {
-      this.log.warn('could not prepare connection', { ...this.logContext, error: e });
-    }
+    console.log(`forked prepareConnection to regionurl=${url}`);
+    this.regionUrl = url;
+    // this.log.debug(`prepareConnection to ${url}`, this.logContext);
+    // try {
+    //   if (isCloud(new URL(url)) && token) {
+    //     this.regionUrlProvider = new RegionUrlProvider(url, token);
+    //     const regionUrl = await this.regionUrlProvider.getNextBestRegionUrl();
+    //     // we will not replace the regionUrl if an attempt had already started
+    //     // to avoid overriding regionUrl after a new connection attempt had started
+    //     if (regionUrl && this.state === ConnectionState.Disconnected) {
+    //       this.regionUrl = regionUrl;
+    //       await fetch(toHttpUrl(regionUrl), { method: 'HEAD' });
+    //       this.log.debug(`prepared connection to ${regionUrl}`, this.logContext);
+    //     }
+    //   } else {
+    //     await fetch(toHttpUrl(url), { method: 'HEAD' });
+    //   }
+    // } catch (e) {
+    //   this.log.warn('could not prepare connection', { ...this.logContext, error: e });
+    // }
   }
 
   connect = async (url: string, token: string, opts?: RoomConnectOptions): Promise<void> => {
@@ -498,24 +498,24 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
       this.regionUrl = undefined;
       this.regionUrlProvider = undefined;
     }
-    if (isCloud(new URL(url))) {
-      if (this.regionUrlProvider === undefined) {
-        this.regionUrlProvider = new RegionUrlProvider(url, token);
-      } else {
-        this.regionUrlProvider.updateToken(token);
-      }
-      // trigger the first fetch without waiting for a response
-      // if initial connection fails, this will speed up picking regional url
-      // on subsequent runs
-      this.regionUrlProvider
-        .fetchRegionSettings()
-        .then((settings) => {
-          this.regionUrlProvider?.setServerReportedRegions(settings);
-        })
-        .catch((e) => {
-          this.log.warn('could not fetch region settings', { ...this.logContext, error: e });
-        });
-    }
+    // if (isCloud(new URL(url))) {
+    //   if (this.regionUrlProvider === undefined) {
+    //     this.regionUrlProvider = new RegionUrlProvider(url, token);
+    //   } else {
+    //     this.regionUrlProvider.updateToken(token);
+    //   }
+    //   // trigger the first fetch without waiting for a response
+    //   // if initial connection fails, this will speed up picking regional url
+    //   // on subsequent runs
+    //   this.regionUrlProvider
+    //     .fetchRegionSettings()
+    //     .then((settings) => {
+    //       this.regionUrlProvider?.setServerReportedRegions(settings);
+    //     })
+    //     .catch((e) => {
+    //       this.log.warn('could not fetch region settings', { ...this.logContext, error: e });
+    //     });
+    // }
 
     const connectFn = async (
       resolve: () => void,

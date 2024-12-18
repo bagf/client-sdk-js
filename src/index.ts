@@ -55,6 +55,7 @@ export { facingModeFromDeviceLabel, facingModeFromLocalTrack } from './room/trac
 export * from './room/track/options';
 export * from './room/track/processor/types';
 export * from './room/track/types';
+import { RegionUrlProvider } from './room/RegionUrlProvider';
 export type {
   DataPublishOptions,
   SimulationScenario,
@@ -100,6 +101,7 @@ export {
   supportsDynacast,
   supportsVP9,
   Mutex,
+  RegionUrlProvider,
 };
 export type {
   AudioAnalyserOptions,
