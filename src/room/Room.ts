@@ -392,6 +392,7 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
         this.emit(RoomEvent.DCBufferStatusChanged, status, kind);
       })
       .on(EngineEvent.LocalTrackSubscribed, (subscribedSid) => {
+        console.log(`forked EngineEvent.LocalTrackSubscribed to subscribedSid=${subscribedSid}`);
         const trackPublication = this.localParticipant
           .getTrackPublications()
           .find(({ trackSid }) => trackSid === subscribedSid) as LocalTrackPublication | undefined;
@@ -494,33 +495,12 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
     }
 
     this.setAndEmitConnectionState(ConnectionState.Connecting);
-    if (this.regionUrlProvider?.getServerUrl().toString() !== url) {
-      this.regionUrl = undefined;
-      this.regionUrlProvider = undefined;
-    }
-    // if (isCloud(new URL(url))) {
-    //   if (this.regionUrlProvider === undefined) {
-    //     this.regionUrlProvider = new RegionUrlProvider(url, token);
-    //   } else {
-    //     this.regionUrlProvider.updateToken(token);
-    //   }
-    //   // trigger the first fetch without waiting for a response
-    //   // if initial connection fails, this will speed up picking regional url
-    //   // on subsequent runs
-    //   this.regionUrlProvider
-    //     .fetchRegionSettings()
-    //     .then((settings) => {
-    //       this.regionUrlProvider?.setServerReportedRegions(settings);
-    //     })
-    //     .catch((e) => {
-    //       this.log.warn('could not fetch region settings', { ...this.logContext, error: e });
-    //     });
-    // }
+    console.log(`forked connect() to regionurl=${url}`);
+    this.regionUrl = url;
 
     const connectFn = async (
       resolve: () => void,
       reject: (reason: any) => void,
-      regionUrl?: string,
     ) => {
       if (this.abortController) {
         this.abortController.abort();
@@ -534,61 +514,22 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
       unlockDisconnect?.();
 
       try {
-        await this.attemptConnection(regionUrl ?? url, token, opts, abortController);
+        await this.attemptConnection(this.regionUrl as string, token, opts, abortController);
         this.abortController = undefined;
         resolve();
       } catch (e) {
-        if (
-          this.regionUrlProvider &&
-          e instanceof ConnectionError &&
-          e.reason !== ConnectionErrorReason.Cancelled &&
-          e.reason !== ConnectionErrorReason.NotAllowed
-        ) {
-          let nextUrl: string | null = null;
-          try {
-            nextUrl = await this.regionUrlProvider.getNextBestRegionUrl(
-              this.abortController?.signal,
-            );
-          } catch (error) {
-            if (
-              error instanceof ConnectionError &&
-              (error.status === 401 || error.reason === ConnectionErrorReason.Cancelled)
-            ) {
-              this.handleDisconnect(this.options.stopLocalTrackOnUnpublish);
-              reject(error);
-              return;
-            }
-          }
-          if (nextUrl && !this.abortController?.signal.aborted) {
-            this.log.info(
-              `Initial connection failed with ConnectionError: ${e.message}. Retrying with another region: ${nextUrl}`,
-              this.logContext,
-            );
-            this.recreateEngine();
-            await connectFn(resolve, reject, nextUrl);
-          } else {
-            this.handleDisconnect(
-              this.options.stopLocalTrackOnUnpublish,
-              getDisconnectReasonFromConnectionError(e),
-            );
-            reject(e);
-          }
-        } else {
-          let disconnectReason = DisconnectReason.UNKNOWN_REASON;
-          if (e instanceof ConnectionError) {
-            disconnectReason = getDisconnectReasonFromConnectionError(e);
-          }
-          this.handleDisconnect(this.options.stopLocalTrackOnUnpublish, disconnectReason);
-          reject(e);
+        let disconnectReason = DisconnectReason.UNKNOWN_REASON;
+        if (e instanceof ConnectionError) {
+          disconnectReason = getDisconnectReasonFromConnectionError(e);
         }
+        this.handleDisconnect(this.options.stopLocalTrackOnUnpublish, disconnectReason);
+        reject(e);
       }
     };
 
-    const regionUrl = this.regionUrl;
-    this.regionUrl = undefined;
     this.connectFuture = new Future(
       (resolve, reject) => {
-        connectFn(resolve, reject, regionUrl);
+        connectFn(resolve, reject);
       },
       () => {
         this.clearConnectionFutures();
@@ -1335,7 +1276,7 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
       return;
     }
 
-    this.regionUrl = undefined;
+    // this.regionUrl = undefined;
 
     try {
       this.remoteParticipants.forEach((p) => {
